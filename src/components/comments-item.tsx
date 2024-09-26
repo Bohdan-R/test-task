@@ -18,10 +18,7 @@ const CommentsItem: React.FC<CommentsItemProps> = ({ comment }) => {
     dispatch(removeComment(id));
   };
   return (
-    <li
-      key={id}
-      className="relative w-[500px] py-2 px-5 border-2 rounded border-[#212121] text-[#969696] mb-4 last:mb-0 transition-all duration-300 hover:border-[#2979ff]"
-    >
+    <li className="relative w-[500px] py-2 px-5 border-2 rounded border-[#212121] text-[#969696] mb-4 last:mb-0 transition-all duration-300 hover:border-[#2979ff]">
       <p className="mb-1 text-[10px]">
         # <span className="font-semibold">{id}</span>
       </p>

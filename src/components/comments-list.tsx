@@ -9,8 +9,9 @@ type CommentsListProps = {
 const CommentsList: React.FC<CommentsListProps> = ({ comments }) => {
   return (
     <ul>
-      {comments.map(comment => {
-        return <CommentsItem comment={comment} />;
+      {comments.map((comment, index) => {
+        const key = `${comment.id}-${comment.user.username}-${index}`;
+        return <CommentsItem comment={comment} key={key} />;
       })}
     </ul>
   );
