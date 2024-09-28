@@ -18,7 +18,7 @@ function App() {
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
   const [newComment, setNewComment, removeNewComment] = useLocalStorage('comment', '');
-  const [page, setPage] = useLocalStorage('currentPage', 1);
+  const [page, setPage] = useLocalStorage('page', 1);
 
   const [currentPage, setCurrentPage] = useState(page);
   const [comment, setComment] = useState(newComment);

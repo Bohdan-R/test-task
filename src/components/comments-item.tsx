@@ -13,7 +13,7 @@ type CommentsItemProps = {
 const CommentsItem: React.FC<CommentsItemProps> = ({ comment }) => {
   const dispatch = useAppDispatch();
 
-  const [page] = useLocalStorage('currentPage', 1);
+  const [page] = useLocalStorage('page', 1);
 
   const { id, body, user } = comment;
 
