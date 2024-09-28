@@ -1,4 +1,5 @@
 import React from 'react';
+import { useLocalStorage } from 'usehooks-ts';
 import { useAppDispatch } from '../store/hooks';
 import { removeComment } from '../store/slices/commentsSlice';
 import { MdDelete } from 'react-icons/md';
@@ -12,10 +13,12 @@ type CommentsItemProps = {
 const CommentsItem: React.FC<CommentsItemProps> = ({ comment }) => {
   const dispatch = useAppDispatch();
 
+  const [page] = useLocalStorage('currentPage', 1);
+
   const { id, body, user } = comment;
 
   const handleDeleteComment = (id: number) => {
-    dispatch(removeComment(id));
+    dispatch(removeComment(id, page));
   };
   return (
     <li className="relative w-[500px] py-2 px-5 border-2 rounded border-[#212121] text-[#969696] mb-4 last:mb-0 transition-all duration-300 hover:border-[#2979ff]">
@@ -30,10 +33,7 @@ const CommentsItem: React.FC<CommentsItemProps> = ({ comment }) => {
       <ButtonIcon
         onClick={() => handleDeleteComment(id)}
         children={
-          <MdDelete
-            className="text-[#212121] group-hover:text-[#969696] transition-colors duration-300"
-            size={25}
-          />
+          <MdDelete className="text-[#212121] group-hover:text-[#969696] transition-colors duration-300" size={25} />
         }
       />
     </li>

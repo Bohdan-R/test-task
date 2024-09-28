@@ -1,10 +1,12 @@
 import { createSlice, PayloadAction } from '@reduxjs/toolkit';
 import { AppDispatch, RootState } from '../index';
+import { Comment, ResponseDataComments } from '../../types/comments';
+import { ITEM_LIMIT } from '../../helpers/constsnts';
 import api from '../../api';
-import { Comment } from '../../types/comments';
 
 type CommentsState = {
-  comments: Comment[];
+  allComments: Comment[];
+  commentsPerPage: Comment[];
   total: number;
   loading: boolean;
   successMessage: string | null;
@@ -12,7 +14,8 @@ type CommentsState = {
 };
 
 const initialState: CommentsState = {
-  comments: [],
+  allComments: [],
+  commentsPerPage: [],
   total: 0,
   loading: false,
   successMessage: null,
@@ -23,16 +26,30 @@ const commentsSlice = createSlice({
   name: 'comments',
   initialState,
   reducers: {
-    getCommentsRequest: state => {
+    getAllCommentsRequest: state => {
       state.loading = true;
       state.errorMessage = null;
       state.successMessage = null;
     },
-    getCommentsSuccess: (state, action: PayloadAction<Comment[]>) => {
+    getAllCommentsSuccess: (state, action: PayloadAction<Comment[]>) => {
       state.loading = false;
-      state.comments = action.payload;
+      state.allComments = action.payload;
     },
-    getCommentsFailure: (state, action: PayloadAction<string>) => {
+    getAllCommentsFailure: (state, action: PayloadAction<string>) => {
+      state.loading = false;
+      state.errorMessage = action.payload;
+    },
+
+    getCommentsByPageRequest: state => {
+      state.loading = true;
+      state.errorMessage = null;
+      state.successMessage = null;
+    },
+    getCommentsByPageSuccess: (state, action: PayloadAction<Comment[]>) => {
+      state.loading = false;
+      state.commentsPerPage = action.payload;
+    },
+    getCommentsByPageFailure: (state, action: PayloadAction<string>) => {
       state.loading = false;
       state.errorMessage = action.payload;
     },
@@ -45,8 +62,8 @@ const commentsSlice = createSlice({
       state.errorMessage = null;
       state.successMessage = null;
     },
-    addCommentSuccess: (state, action: PayloadAction<Comment>) => {
-      state.comments = [action.payload, ...state.comments.slice(0, 9)];
+    addCommentSuccess: (state, action: PayloadAction<Comment[]>) => {
+      state.commentsPerPage = action.payload;
       state.successMessage = 'Comment successfully added';
       state.errorMessage = null;
     },
@@ -60,7 +77,7 @@ const commentsSlice = createSlice({
       state.successMessage = null;
     },
     deleteCommentSuccess: (state, action: PayloadAction<Comment[]>) => {
-      state.comments = action.payload;
+      state.commentsPerPage = action.payload;
       state.successMessage = 'Comment successfully deleted';
       state.errorMessage = null;
     },
@@ -72,9 +89,12 @@ const commentsSlice = createSlice({
 });
 
 export const {
-  getCommentsRequest,
-  getCommentsSuccess,
-  getCommentsFailure,
+  getAllCommentsRequest,
+  getAllCommentsSuccess,
+  getAllCommentsFailure,
+  getCommentsByPageRequest,
+  getCommentsByPageSuccess,
+  getCommentsByPageFailure,
   getTotalComments,
   addCommentRequest,
   addCommentSuccess,
@@ -86,32 +106,72 @@ export const {
 
 export default commentsSlice.reducer;
 
-export const getComments = (limit: number, skip: number) => async (dispatch: AppDispatch) => {
+export const getComments = () => async (dispatch: AppDispatch) => {
   try {
-    dispatch(getCommentsRequest());
+    dispatch(getAllCommentsRequest());
 
-    const response = await api.comments.getComments(limit, skip);
-    const { comments, total } = response?.data || {};
+    const response = await api.comments.getAllComments();
+    const { comments, total }: ResponseDataComments = response?.data || { comments: [], total: 0 };
 
-    dispatch(getCommentsSuccess(comments));
+    const sortedComments = comments.sort((a, b) => b.id - a.id);
+
+    dispatch(getAllCommentsSuccess(sortedComments));
+    dispatch(getCommentsByPageSuccess(sortedComments.slice(0, ITEM_LIMIT)));
     dispatch(getTotalComments(total));
   } catch (error: unknown) {
     if (error instanceof Error) {
-      dispatch(getCommentsFailure(error.message));
+      dispatch(getAllCommentsFailure(error.message));
     } else {
-      dispatch(getCommentsFailure('Error loading comments'));
+      dispatch(getAllCommentsFailure('Error loading comments'));
     }
   }
 };
 
+export const getCommentsByPage =
+  (limit: number, skip: number) => async (dispatch: AppDispatch, getState: () => RootState) => {
+    try {
+      dispatch(getCommentsByPageRequest());
+
+      const { allComments } = getState().comments;
+
+      dispatch(getCommentsByPageSuccess(allComments.slice(skip, skip + limit)));
+    } catch (error: unknown) {
+      if (error instanceof Error) {
+        dispatch(getCommentsByPageFailure(error.message));
+      } else {
+        dispatch(getCommentsByPageFailure('Error loading comments'));
+      }
+    }
+  };
+
 export const postComment =
-  (body: string, postId: number, userId: number) => async (dispatch: AppDispatch) => {
+  (body: string, userId: number, currentPage: number) => async (dispatch: AppDispatch, getState: () => RootState) => {
     try {
       dispatch(addCommentRequest());
 
-      const response = await api.comments.addComments(body, postId, userId);
+      const { allComments, total } = getState().comments;
+      const lastId = allComments[0].id + 1;
+      const skip = (currentPage - 1) * ITEM_LIMIT;
 
-      dispatch(addCommentSuccess(response.data));
+      const user = {
+        id: userId,
+        username: 'Dart',
+        fullName: 'Weider',
+      };
+
+      const newComment = {
+        body,
+        id: lastId,
+        likes: 20,
+        postId: 3,
+        user,
+      };
+
+      const updatedDate = [newComment, ...allComments];
+
+      dispatch(getTotalComments(total + 1));
+      dispatch(addCommentSuccess(updatedDate.slice(skip, skip + ITEM_LIMIT)));
+      dispatch(getAllCommentsSuccess(updatedDate));
     } catch (error: unknown) {
       if (error instanceof Error) {
         dispatch(addCommentFailure(error.message));
@@ -122,39 +182,18 @@ export const postComment =
   };
 
 export const removeComment =
-  (commentId: number) => async (dispatch: AppDispatch, getState: () => RootState) => {
+  (commentId: number, currentPage: number) => async (dispatch: AppDispatch, getState: () => RootState) => {
     try {
       dispatch(deleteCommentRequest());
+      const { allComments, total } = getState().comments;
 
-      const state = getState();
-      const { comments } = state.comments;
+      const skip = (currentPage - 1) * ITEM_LIMIT;
 
-      // fake API can't remove item with ID over 340
-      if (commentId <= 340) {
-        await api.comments.deleteComments(commentId);
-      }
+      const updatedComments = allComments.filter(c => c.id !== commentId);
 
-      // functionality that allows you to leave 10 comments on a page after deletion, except for the case when there are several created comments with ID 341
-      const updatedComments = comments.filter(comment => comment.id !== commentId);
-
-      const lastId = comments.reduce((lastId, comment) => {
-        if (comment.id <= 340) {
-          lastId = comment.id > lastId ? comment.id : lastId;
-        }
-
-        if (lastId >= 341 && comment.id <= 340) {
-          lastId = comment.id;
-        }
-
-        return lastId;
-      }, updatedComments[0].id);
-
-      const finalId = lastId >= 341 ? 1 : lastId + 1;
-
-      const response = await api.comments.getCommentById(finalId);
-      const addedComment: Comment = response.data;
-
-      dispatch(deleteCommentSuccess([...updatedComments, addedComment]));
+      dispatch(deleteCommentSuccess(updatedComments.slice(skip, skip + ITEM_LIMIT)));
+      dispatch(getAllCommentsSuccess(updatedComments));
+      dispatch(getTotalComments(total - 1));
     } catch (error: unknown) {
       if (error instanceof Error) {
         dispatch(deleteCommentFailure(error.message));
